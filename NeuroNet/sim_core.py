@@ -139,6 +139,8 @@ class SNN:
         for pre in spikes:
             for s in self.outgoing.get(pre, []):
                 deliver_at = int(round(t + s.delay_ms))
+                if deliver_at <= now_bin:
+                    deliver_at = now_bin + 1
                 self._schedule_current(deliver_at, s.post, s.w)
 
         # --- Plasticity bookkeeping ---
