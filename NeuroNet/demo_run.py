@@ -4,7 +4,8 @@ import sys
 import logging
 import random
 
-from sim_core import SNN, Synapse, LIFConfig
+from sim_core import LIFConfig
+from processing_core import ProcessingCore
 from concrete_io import (
     SimpleScreen,
     PositionEncoder,           # use full input population
@@ -23,27 +24,34 @@ RENDER_CLEARS = True
 # --- Setup network ---
 W, H = 16, 9
 N_IN = W * H          # one neuron per screen cell
+N_PROC = 64 
 N_OUT = 4             # up, down, left, right
-OUT0 = N_IN           # first output neuron index
-OUT_IDS = [OUT0 + i for i in range(N_OUT)]  # [N_IN, N_IN+1, N_IN+2, N_IN+3]
 
 lif = LIFConfig(v_rest=0.0, v_reset=0.0, v_thresh=1.0, tau_m_ms=10.0, r_m=1.0, tau_ref_ms=2.0)
-net = SNN(num_neurons=N_IN + N_OUT, lif_template=lif)
+core = ProcessingCore(lif_input=lif, lif_hidden=lif, lif_output=lif)
+pop_in = core.add_population("in", N_IN)
+pop_proc = core.add_population("proc", N_PROC)
+pop_out = core.add_population("out", N_OUT)
+core.build()
+net = core.net  
 
-# Random small plastic feedforward weights from all inputs -> each output
-for pre in range(N_IN):
-    for d in range(N_OUT):
-        post = OUT_IDS[d]
-        w0 = random.uniform(1.1, 1.5)
-        net.add_synapse(Synapse(pre=pre, post=post, w=w0, delay_ms=0.0, plastic=True))
+probe_pre = pop_in.start + 0               # top-left pixel neuron
+probe_post = list(pop_out.ids)[0]          # "up"
+def probe_weight():
+    for s in net._syn_list:
+        if s.plastic and s.pre == probe_pre and s.post == probe_post:
+            return s.w
+    return None
 
+# Input -> Processing (plastic)
+core.dense(pop_in, pop_proc, w=(0.8, 1.2), delay_ms=0.0, plastic=True)
 
-# Lateral inhibition among outputs to encourage a single winner
-INH = -0.6
-DELAY = 0.0
-pairs = [(a, b) for a in OUT_IDS for b in OUT_IDS if a != b]
-for pre, post in pairs:
-    net.add_synapse(Synapse(pre=pre, post=post, w=INH, delay_ms=DELAY))
+# Processing -> Output (plastic or fixed; start plastic to learn a mapping)
+core.dense(pop_proc, pop_out, w=(0.6, 1.0), delay_ms=0.0, plastic=True)
+
+# Competition in processing & outputs
+core.lateral_inhibition(pop_proc, w_inh=-0.3, delay_ms=0.0)
+core.lateral_inhibition(pop_out, w_inh=-0.6, delay_ms=0.0)
 
 
 # --- Setup I/O ---
@@ -51,18 +59,19 @@ env = SimpleScreen(width=W, height=H)
 env.apply_action(0.0, ScreenAction(kind=ScreenActionType.DRAW_DOT, x=W // 2, y=H // 2))
 
 # Encode the dot's position as a single active input neuron (y*W + x)
-encoder = PositionEncoder(width=W, height=H, base_id=0, min_interval_ms=5.0)
+encoder = PositionEncoder(width=W, height=H, base_id=pop_in.start, min_interval_ms=5.0)
 
 # Decoder looks at the actual output neuron IDs (N_IN..N_IN+3)
+out_ids = list(pop_out.ids)
 decoder = FirstToSpikeMoveDecoder(
-    up_ids=[OUT_IDS[0]],
-    down_ids=[OUT_IDS[1]],
-    left_ids=[OUT_IDS[2]],
-    right_ids=[OUT_IDS[3]],
-    readout_period_ms=100.0,
-    min_action_delay_ms=1.0,
-    step=1
-)
+    up_ids=[out_ids[0]],
+    down_ids=[out_ids[1]],
+    left_ids=[out_ids[2]],
+    right_ids=[out_ids[3]],
+     readout_period_ms=100.0,
+     min_action_delay_ms=1.0,
+     step=1
+ )
 io = IOCoordinator(env, encoder, decoder)
 decoder.reset()
 
