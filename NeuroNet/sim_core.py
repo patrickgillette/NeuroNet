@@ -49,6 +49,17 @@ class Neuron:
             return True
         return False
 
+
+@dataclass
+class PlasticityConfig:
+    eta: float = 0.002        # learning rate
+    tau_trace_ms: float = 200.0
+    tau_elig_ms: float = 300.0
+    A_pre: float = 1.0
+    A_post: float = 1.0
+    w_min: float = -1.0
+    w_max: float = 1.0
+
 # ----------------------------
 # Synapses with delay/weight
 # ----------------------------
@@ -56,8 +67,9 @@ class Neuron:
 class Synapse:
     pre: NeuronId
     post: NeuronId
-    w: float            # current injected (arbitrary units)
-    delay_ms: float     # axonal delay
+    w: float
+    delay_ms: float
+    plastic: bool = False
 
 # ----------------------------
 # Network + scheduler
@@ -73,8 +85,21 @@ class SNN:
         # ring buffer for future currents (ms resolution)
         self._pending_currents: DefaultDict[int, float] = defaultdict(float)
 
+        self._syn_list: List[Synapse] = []          # flat list keeps stable indices
+        self._outgoing_idx: DefaultDict[int, List[int]] = defaultdict(list)
+        self.plastic_cfg = PlasticityConfig()
+
+        # traces and eligibilities (by synapse index)
+        self._pre_tr: DefaultDict[int, float] = defaultdict(float)
+        self._post_tr: DefaultDict[int, float] = defaultdict(float)
+        self._elig: DefaultDict[int, float] = defaultdict(float)
+        self._t_last = 0.0
+
     def add_synapse(self, s: Synapse) -> None:
-        self.outgoing[s.pre].append(s)
+        idx = len(self._syn_list)
+        self._syn_list.append(s)
+        self.outgoing[s.pre].append(s)          # keep old mapping (for delivery weights)
+        self._outgoing_idx[s.pre].append(idx) 
 
     def _schedule_current(self, deliver_at_ms: int, target: int, current: float) -> None:
         # Accumulate current that will be delivered at that integer ms to target
@@ -110,11 +135,61 @@ class SNN:
             if neuron.step(t, dt_ms, i_in[nid]):
                 spikes.append(nid)
 
-        # propagate spikes through synapses
+        # propagate through synapses (as before)
         for pre in spikes:
             for s in self.outgoing.get(pre, []):
                 deliver_at = int(round(t + s.delay_ms))
                 self._schedule_current(deliver_at, s.post, s.w)
 
+        # --- Plasticity bookkeeping ---
+        # decay traces and eligibilities
+        if self._syn_list:
+            dt = t - self._t_last
+            self._t_last = t
+            pc = self.plastic_cfg
+            decay_pre = pow(2.718281828, -dt / pc.tau_trace_ms)
+            decay_post = pow(2.718281828, -dt / pc.tau_trace_ms)
+            decay_elig = pow(2.718281828, -dt / pc.tau_elig_ms)
+            for idx, s in enumerate(self._syn_list):
+                if s.plastic:
+                    self._pre_tr[idx] *= decay_pre
+                    self._post_tr[idx] *= decay_post
+                    self._elig[idx] *= decay_elig
+
+        # on pre spikes: bump pre-trace and eligibility by post-trace
+        for pre in spikes:
+            for idx in self._outgoing_idx.get(pre, []):
+                s = self._syn_list[idx]
+                if not s.plastic: 
+                    continue
+                self._pre_tr[idx] += self.plastic_cfg.A_pre
+                self._elig[idx] += self.plastic_cfg.A_pre * self._post_tr[idx]
+
+        # on post spikes: bump post-trace and eligibility by pre-trace
+        for post in spikes:
+            # find all synapses that target this post
+            for idx, s in enumerate(self._syn_list):
+                if s.plastic and s.post == post:
+                    self._post_tr[idx] += self.plastic_cfg.A_post
+                    self._elig[idx] += self.plastic_cfg.A_post * self._pre_tr[idx]
+
         return spikes
+
+    def apply_reward(self, r: float) -> None:
+        pc = self.plastic_cfg
+        # write back updated weights with clipping
+        new_list = []
+        for idx, s in enumerate(self._syn_list):
+            if s.plastic:
+                dw = pc.eta * r * self._elig[idx]
+                w = max(pc.w_min, min(pc.w_max, s.w + dw))
+                s = Synapse(pre=s.pre, post=s.post, w=w, delay_ms=s.delay_ms, plastic=True)
+            new_list.append(s)
+        self._syn_list = new_list
+        # also refresh the easy-to-use outgoing with new weights
+        self.outgoing.clear()
+        for s in self._syn_list:
+            self.outgoing[s.pre].append(s)
+
+
 

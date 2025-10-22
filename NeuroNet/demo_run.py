@@ -1,5 +1,6 @@
 
 import time
+from typing import Optional, Tuple
 from sim_core import SNN, Synapse, LIFConfig
 from concrete_io import SimpleScreen,  HalfPlaneDirectionEncoder, FirstToSpikeMoveDecoder
 from screen_interface import IOCoordinator, SimTime, ScreenAction, ScreenActionType
@@ -15,9 +16,20 @@ CSI_HOME_CLEAR = "\x1b[H\x1b[J"  # go home + clear screen
 RENDER_CLEARS = True
 
 # --- Setup network ---
-N_OUT = 4  # up, down, left, right
+import random
+N_IN = 16*9
+N_OUT = 4
+
 lif = LIFConfig(v_rest=0.0, v_reset=0.0, v_thresh=1.0, tau_m_ms=10.0, r_m=1.0, tau_ref_ms=2.0)
-net = SNN(num_neurons=N_OUT, lif_template=lif)
+net = SNN(num_neurons=N_IN + N_OUT, lif_template=lif)
+
+# random small weights, short delay
+for pre in range(N_IN):
+    for d in range(N_OUT):
+        post = N_IN + d
+        w0 = random.uniform(-0.05, 0.05)
+        net.add_synapse(Synapse(pre=pre, post=post, w=w0, delay_ms=1.0, plastic=True))
+
 
 # --- Setup I/O ---
 env = SimpleScreen(width=16, height=9)
@@ -61,6 +73,16 @@ def render_ascii(env, t):
 def stimulate_direction(t: SimTime, dir_id: int, strength: float = 1.2):
     net.inject_spike(t, dir_id, strength)
 
+def find_dot(frame) -> Optional[Tuple[int,int]]:
+    for y in range(frame.height):
+        for x in range(frame.width):
+            if frame.get(x,y) != 0:
+                return (x,y)
+    return None
+
+def dist_to_wall(x, y, w, h):
+    return min(x, y, w-1-x, h-1-y)
+
 # --- Continuous simulation ---
 dt = 10.0  # ms
 t = 0.0
@@ -91,9 +113,30 @@ try:
         for nid in spikes:
             io.on_output_spike(t, nid)
         
+        frame_before = env.observe(t)
+        pos_before = find_dot(frame_before)
+
         action = io.maybe_emit_action(t)
-       # if action is not None:
-            #print(f"[{t:7.1f} ms] ACTION -> {action}")
+
+        frame_after = env.observe(t)
+        pos_after = find_dot(frame_after)
+
+        r = 0.0
+        if pos_before and pos_after:
+            x0,y0 = pos_before
+            x1,y1 = pos_after
+            if (x1,y1) == (x0,y0):
+                r = -1.0   # tried to move into wall; punish
+            else:
+                # reward moving to safer space: farther from walls
+                w, h = frame_after.width, frame_after.height
+                gain = dist_to_wall(x1,y1,w,h) - dist_to_wall(x0,y0,w,h)
+                r = 0.2 + 0.1*gain  # small base reward plus bonus if farther from edges
+
+        # apply reward to the network
+        if r != 0.0:
+            net.apply_reward(r)
+
         # 3) Render (cosmetic)
         if int(t) % 200 == 0:
             render_ascii(env, t)

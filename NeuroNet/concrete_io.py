@@ -33,7 +33,15 @@ class SimpleScreen(ScreenEnvironment):
         if action.kind == ScreenActionType.MOVE:
             dx = action.dx or 0
             dy = action.dy or 0
-            self._move(dx, dy, draw=action.draw, ch_code=1)
+            if action.draw is False:               
+                # 1) move cursor (no drawing during move)
+                self._move(dx, dy, draw=False, ch_code=1)
+                # 2) clear the frame and draw a single dot at the new cursor
+                self._clear()
+                self._put_char(self._cursor_x, self._cursor_y, 1)
+            else:
+                # legacy behavior: leave a path
+                self._move(dx, dy, draw=True, ch_code=1)
             return
 
 # ----------------------------
@@ -99,13 +107,13 @@ class FirstToSpikeMoveDecoder(Decoder):
         if self._first is not None:
             dir_, _ = self._first
             if dir_ == "up":
-                action = ScreenAction(kind=ScreenActionType.MOVE, dx=0, dy=-self.step)
+                action = ScreenAction(kind=ScreenActionType.MOVE, dx=0, dy=-self.step, draw=False)
             elif dir_ == "down":
-                action = ScreenAction(kind=ScreenActionType.MOVE, dx=0, dy=self.step)
+                action = ScreenAction(kind=ScreenActionType.MOVE, dx=0, dy=self.step, draw=False)
             elif dir_ == "left":
-                action = ScreenAction(kind=ScreenActionType.MOVE, dx=-self.step, dy=0)
+                action = ScreenAction(kind=ScreenActionType.MOVE, dx=-self.step, dy=0, draw=False)
             elif dir_ == "right":
-                action = ScreenAction(kind=ScreenActionType.MOVE, dx=self.step, dy=0)
+                action = ScreenAction(kind=ScreenActionType.MOVE, dx=self.step, dy=0, draw=False)
 
         # reset window
         self._window_start = t
@@ -114,14 +122,6 @@ class FirstToSpikeMoveDecoder(Decoder):
 
 
 class HalfPlaneDirectionEncoder(Encoder):
-    """
-    Very simple visual encoder: inspects the Frame each tick and emits at most
-    one spike to the output direction populations (up/down/left/right) depending
-    on which half-plane contains the most 'ink' (non-zero cells).
-
-    Mapping (must match your output neuron IDs):
-      up_id, down_id, left_id, right_id
-    """
     def __init__(self, up_id: int, down_id: int, left_id: int, right_id: int,
                  min_interval_ms: float = 50.0):
         self.up_id = int(up_id)
@@ -172,3 +172,23 @@ class HalfPlaneDirectionEncoder(Encoder):
         if spikes:
             self._last_emit = t
         return spikes
+
+class PositionEncoder(Encoder):
+    def __init__(self, width: int, height: int, base_id: int = 0, min_interval_ms: float = 10.0):
+        self.w = int(width)
+        self.h = int(height)
+        self.base = int(base_id)
+        self._last_emit = None
+        self._min_interval = float(min_interval_ms)
+
+    def encode(self, t: SimTime, observation: Frame):
+        if self._last_emit is not None and (t - self._last_emit) < self._min_interval:
+            return []
+        # find the dot (first non-zero)
+        for y in range(observation.height):
+            for x in range(observation.width):
+                if observation.get(x, y) != 0:
+                    nid = self.base + y * self.w + x
+                    self._last_emit = t
+                    return [(nid, 0.0)]
+        return []
