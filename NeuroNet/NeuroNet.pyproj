@@ -26,7 +26,7 @@
     <Compile Include="core\runtime.py" />
     <Compile Include="demos\demo_run.py" />
     <Compile Include="core\goals.py" />
-    <Compile Include="io_core.py" />
+    <Compile Include="core\io_core.py" />
     <Compile Include="sim\processing_core.py" />
     <Compile Include="core\interfaces.py" />
     <Compile Include="sim\sim_core.py" />
