@@ -108,7 +108,7 @@ class SNN:
 
     def inject_spike(self, t: SimTime, post: int, current: float) -> None:
         # external spike -> immediate (this step) current accumulation
-        key = (int(round(t)) << 16) | post
+        key = (int(t) << 16) | post
         self._pending_currents[key] += current
 
     def step(self, t: SimTime, dt_ms: float) -> List[int]:
@@ -116,14 +116,14 @@ class SNN:
         Advance network by dt_ms. Returns list of spiking neuron IDs at end of step.
         Current delivery is at integer-millisecond bins for simplicity.
         """
-        now_bin = int(round(t))
+        now_bin = int(t)
         # Gather input currents scheduled for this bin
         i_in: List[float] = [0.0] * len(self.neurons)
-        # pull and clear all entries whose time == now_bin
+        # pull and clear all entries whose time <= now_bin
         keys_to_delete = []
         for key, cur in self._pending_currents.items():
             time_bin = key >> 16
-            if time_bin == now_bin:
+            if time_bin <= now_bin:
                 nid = key & 0xFFFF
                 i_in[nid] += cur
                 keys_to_delete.append(key)
@@ -138,9 +138,7 @@ class SNN:
         # propagate through synapses (as before)
         for pre in spikes:
             for s in self.outgoing.get(pre, []):
-                deliver_at = int(round(t + s.delay_ms))
-                if deliver_at <= now_bin:
-                    deliver_at = now_bin + 1
+                deliver_at = int(t + s.delay_ms)
                 self._schedule_current(deliver_at, s.post, s.w)
 
         # --- Plasticity bookkeeping ---
