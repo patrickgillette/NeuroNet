@@ -23,6 +23,7 @@
   <ItemGroup>
     <Compile Include="concrete_io.py" />
     <Compile Include="demo_run.py" />
+    <Compile Include="io_core.py" />
     <Compile Include="NeuroNet.py" />
     <Compile Include="processing_core.py" />
     <Compile Include="screen_interface.py" />
