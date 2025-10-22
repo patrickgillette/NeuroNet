@@ -298,7 +298,7 @@ class RateWindowPutCharDecoder(ConsoleDecoder):
 class CLIRenderer:
     """
     Renders a Frame to the terminal (stdout). The Environment remains the source of truth.
-    You can call this at a slower cadence than the sim loop (e.g., every 50–100 ms).
+    You can call this at a slower cadence than the sim loop (e.g., every 50-100 ms).
     """
 
     def __init__(self):
