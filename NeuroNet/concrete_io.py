@@ -111,3 +111,64 @@ class FirstToSpikeMoveDecoder(Decoder):
         self._window_start = t
         self._first = None
         return action
+
+
+class HalfPlaneDirectionEncoder(Encoder):
+    """
+    Very simple visual encoder: inspects the Frame each tick and emits at most
+    one spike to the output direction populations (up/down/left/right) depending
+    on which half-plane contains the most 'ink' (non-zero cells).
+
+    Mapping (must match your output neuron IDs):
+      up_id, down_id, left_id, right_id
+    """
+    def __init__(self, up_id: int, down_id: int, left_id: int, right_id: int,
+                 min_interval_ms: float = 50.0):
+        self.up_id = int(up_id)
+        self.down_id = int(down_id)
+        self.left_id = int(left_id)
+        self.right_id = int(right_id)
+        self._last_emit: Optional[SimTime] = None
+        self._min_interval = float(min_interval_ms)
+
+    def encode(self, t: SimTime, observation: Frame):
+        # throttle to avoid over-stimulation
+        if self._last_emit is not None and (t - self._last_emit) < self._min_interval:
+            return []
+
+        w, h = observation.width, observation.height
+        mid_x, mid_y = w // 2, h // 2
+
+        top = bottom = left = right = 0
+        # count 'ink' (non-zero cells) in each half-plane
+        for y in range(h):
+            for x in range(w):
+                v = observation.get(x, y)
+                if v == 0:
+                    continue
+                if y < mid_y: top += 1
+                else: bottom += 1
+                if x < mid_x: left += 1
+                else: right += 1
+
+        # choose vertical direction (toward denser half)
+        vertical_spike = None
+        if top > bottom:
+            vertical_spike = (self.up_id, 0.0)
+        elif bottom > top:
+            vertical_spike = (self.down_id, 0.0)
+
+        # choose horizontal direction (toward denser half)
+        horizontal_spike = None
+        if left > right:
+            horizontal_spike = (self.left_id, 0.0)
+        elif right > left:
+            horizontal_spike = (self.right_id, 0.0)
+
+        spikes = []
+        if vertical_spike: spikes.append(vertical_spike)
+        if horizontal_spike: spikes.append(horizontal_spike)
+
+        if spikes:
+            self._last_emit = t
+        return spikes
