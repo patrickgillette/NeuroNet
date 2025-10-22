@@ -120,12 +120,12 @@ try:
             io.on_output_spike(t, nid)
         
 
-        action = io.maybe_emit_action(t)
+        
 
 
         frame_before = env.observe(t)
         pos_before = find_dot(frame_before)   
-
+        action = io.maybe_emit_action(t)
         frame_after = env.observe(t)
         pos_after = find_dot(frame_after)
 
