@@ -2,7 +2,7 @@
 import time
 from sim_core import SNN, Synapse, LIFConfig
 from concrete_io import SimpleScreen,  HalfPlaneDirectionEncoder, FirstToSpikeMoveDecoder
-from screen_interface import IOCoordinator, SimTime, ScreenActionType
+from screen_interface import IOCoordinator, SimTime, ScreenAction, ScreenActionType
 import sys, time
 from colorama import init as colorama_init
 import logging
@@ -11,7 +11,7 @@ logging.basicConfig(filename="neuron_log.txt", level=logging.INFO, format="%(mes
 colorama_init()  # enable ANSI on Windows
 
 CSI_HOME_CLEAR = "\x1b[H\x1b[J"  # go home + clear screen
-RENDER_CLEARS = False
+RENDER_CLEARS = True
 
 # --- Setup network ---
 N_OUT = 4  # up, down, left, right
@@ -20,6 +20,8 @@ net = SNN(num_neurons=N_OUT, lif_template=lif)
 
 # --- Setup I/O ---
 env = SimpleScreen(width=16, height=9)
+env.apply_action(0.0, ScreenAction(kind=ScreenActionType.DRAW_DOT, x=8, y=4))
+
 #encoder = NullEncoder(target_neuron_ids=[])   #old
 from concrete_io import HalfPlaneDirectionEncoder
 encoder = HalfPlaneDirectionEncoder(
@@ -73,19 +75,19 @@ try:
 
         if enc_spikes:
             msg = f"[{t:7.1f} ms] ENCODER -> {enc_spikes}"
-            print(msg)
+            #print(msg)
             logging.info(msg)
 
         # 2) Step network and collect spikes
         spikes = net.step(t, dt_ms=dt)
-        if spikes:
-            print(f"\nSpikes @ {t:.1f} ms:", spikes)
+        #if spikes:
+            #print(f"\nSpikes @ {t:.1f} ms:", spikes)
         for nid in spikes:
             io.on_output_spike(t, nid)
         
         action = io.maybe_emit_action(t)
-        if action is not None:
-            print(f"[{t:7.1f} ms] ACTION -> {action}")
+       # if action is not None:
+            #print(f"[{t:7.1f} ms] ACTION -> {action}")
         # 3) Render (cosmetic)
         if int(t) % 200 == 0:
             render_ascii(env, t)
