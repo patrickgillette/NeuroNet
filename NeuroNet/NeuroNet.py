@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterable, Optional, Protocol, Tuple
 
 SimTime = float  # milliseconds
-
+#This is a SNN meant to take arbitrary external data as input and output actions/values.
+# Define abstract base classes for encoders, decoders, environments, and I/O adapters.
+# These can be subclassed to implement specific functionality.
 class Encoder(ABC):
     """External data -> spikes into a target InputArea."""
     @abstractmethod
