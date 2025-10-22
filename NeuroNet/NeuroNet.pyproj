@@ -4,7 +4,8 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>7c77ee07-50b5-451a-ab44-3f226d9d6d43</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>NeuroNet.py</StartupFile>
+    <StartupFile>
+    </StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -21,13 +22,21 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="concrete_io.py" />
-    <Compile Include="demo_run.py" />
+    <Compile Include="adapters\screen\goals.py" />
+    <Compile Include="core\runtime.py" />
+    <Compile Include="demos\demo_run.py" />
+    <Compile Include="core\goals.py" />
     <Compile Include="io_core.py" />
-    <Compile Include="NeuroNet.py" />
-    <Compile Include="processing_core.py" />
-    <Compile Include="screen_interface.py" />
-    <Compile Include="sim_core.py" />
+    <Compile Include="sim\processing_core.py" />
+    <Compile Include="core\interfaces.py" />
+    <Compile Include="sim\sim_core.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="adapters\" />
+    <Folder Include="adapters\screen\" />
+    <Folder Include="core\" />
+    <Folder Include="demos\" />
+    <Folder Include="sim\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
