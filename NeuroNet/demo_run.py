@@ -10,6 +10,7 @@ logging.basicConfig(filename="neuron_log.txt", level=logging.INFO, format="%(mes
 
 colorama_init()  # enable ANSI on Windows
 
+
 CSI_HOME_CLEAR = "\x1b[H\x1b[J"  # go home + clear screen
 RENDER_CLEARS = True
 
@@ -36,6 +37,11 @@ decoder = FirstToSpikeMoveDecoder(
 io = IOCoordinator(env, encoder, decoder)
 decoder.reset()
 
+from sim_core import Synapse
+INH = -0.6; DELAY = 5.0
+pairs = [(0,1),(0,2),(0,3),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,0),(3,1),(3,2)]
+for pre, post in pairs:
+    net.add_synapse(Synapse(pre=pre, post=post, w=INH, delay_ms=DELAY))
 
 # --- Utilities ---
 def render_ascii(env, t):
