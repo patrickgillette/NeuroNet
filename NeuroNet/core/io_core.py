@@ -1,4 +1,16 @@
 
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Protocol, Set
+
+# -----------------------------------------------------------------------------
+# Core types
+# -----------------------------------------------------------------------------
+SimTime = float  # milliseconds
+NeuronId = int
+
 """
 io_core.py — Generic I/O interfaces and a multi-port coordinator for SNN loops.
 
@@ -19,18 +31,6 @@ Design goals:
 
 This is single-threaded and simulation-time oriented; no wall-clock sleeps here.
 """
-from __future__ import annotations
-
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Protocol, Set
-
-# -----------------------------------------------------------------------------
-# Core types
-# -----------------------------------------------------------------------------
-SimTime = float  # milliseconds
-NeuronId = int
-
 
 # -----------------------------------------------------------------------------
 # Base interfaces
