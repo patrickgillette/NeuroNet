@@ -22,11 +22,14 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="adapters\screen\decoders.py" />
+    <Compile Include="adapters\screen\encoders.py" />
+    <Compile Include="adapters\screen\env.py" />
     <Compile Include="adapters\screen\goals.py" />
+    <Compile Include="core\interface_core.py" />
     <Compile Include="core\runtime.py" />
     <Compile Include="demos\demo_run.py" />
     <Compile Include="core\goals.py" />
-    <Compile Include="core\inout_core.py" />
     <Compile Include="sim\processing_core.py" />
     <Compile Include="core\interfaces.py" />
     <Compile Include="sim\sim_core.py" />

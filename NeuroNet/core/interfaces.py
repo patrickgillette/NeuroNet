@@ -54,18 +54,3 @@ class Frame:
     def set(self, x: int, y: int, v: int) -> None: self._cells[y][x] = v
     def to_readonly(self) -> Tuple[Tuple[int, ...], ...]:
         return tuple(tuple(row) for row in self._cells)
-
-# ---- Glue: I/O coordinator ----
-class IOCoordinator:
-    def __init__(self, env: Environment, encoder: Encoder, decoder: Decoder):
-        self._env, self._encoder, self._decoder = env, encoder, decoder
-    def on_output_spike(self, t: SimTime, neuron_id: int) -> None:
-        self._decoder.on_spike(t, neuron_id)
-    def maybe_emit_action(self, t: SimTime) -> Optional[Any]:
-        action = self._decoder.readout(t)
-        if action is not None:
-            self._env.apply_action(t, action)
-        return action
-    def encode_observation(self, t: SimTime) -> Iterable[Tuple[int, float]]:
-        obs = self._env.observe(t)
-        return self._encoder.encode(t, obs)

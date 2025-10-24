@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Iterable, Optional, Dict
 
-from sim_core import SNN, Synapse, LIFConfig
+from .sim_core import SNN, Synapse, LIFConfig
 
 NeuronRange = Tuple[int, int]  # [start, end) neuron ids
 
@@ -17,13 +17,6 @@ class Pop:
         return range(self.start, self.start + self.size)
 
 class ProcessingCore:
-    """
-    Owns neuron id layout and connectivity between:
-      - input population(s) (targets for Encoders)
-      - processing population(s) (plastic)
-      - output population(s) (readout for Decoders)
-    Encoders/Decoders only receive/populate ids via this object.
-    """
     def __init__(self,
                  lif_input: Optional[LIFConfig] = None,
                  lif_hidden: Optional[LIFConfig] = None,
